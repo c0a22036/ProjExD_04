@@ -86,6 +86,7 @@ class Bird(pg.sprite.Sprite):
         押下キーに応じてこうかとんを移動させる
         引数1 key_lst：押下キーの真理値リスト
         引数2 screen：画面Surface
+        追加機能1（こうかとんの高速化）
         """
         sum_mv = [0, 0]
         for k, mv in __class__.delta.items():
@@ -100,6 +101,13 @@ class Bird(pg.sprite.Sprite):
         if not (sum_mv[0] == 0 and sum_mv[1] == 0):
             self.dire = tuple(sum_mv)
             self.image = self.imgs[self.dire]
+
+        for event in pg.event.get(): #左シフトをおすと速度が上がる
+            if event.type == pg.KEYDOWN and event.key == pg.K_LSHIFT:
+                self.speed = 20
+            elif event.type == pg.KEYDOWN:
+                self.speed = 10
+                
         screen.blit(self.image, self.rect)
     
     def get_direction(self) -> tuple[int, int]:
