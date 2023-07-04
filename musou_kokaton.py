@@ -2,8 +2,10 @@ import math
 import random
 import sys
 import time
+from typing import Any
 
 import pygame as pg
+from pygame.sprite import AbstractGroup
 
 
 WIDTH = 1600  # ゲームウィンドウの幅
@@ -248,6 +250,30 @@ class Score:
         self.image = self.font.render(f"Score: {self.score}", 0, self.color)
         screen.blit(self.image, self.rect)
 
+class Shield(pg.sprite.Sprite):
+    def __init__(self, bird:Bird, life:int):
+        """
+        防御壁に関するクラス
+        引数1:こうかとんオブジェクト
+        引数2:防御壁の発動時間
+        """
+        super().__init__()
+        vx, vy = bird.dire
+        theta = math.atan2(-vy, vx)
+        angle = math.degrees(theta)
+        self.image = pg.Surface((20, bird.rect.height * 2))
+        self.image = pg.transform.rotozoom(self.image, angle, 1.0)
+        pg.draw.rect(self.image, (0, 0, 0), pg.Rect(0, 0, 20, bird.rect.height * 2))
+        self.rect = self.image.get_rect()
+        self.rect.centerx = bird.rect.centerx + bird.rect.width * vx
+        self.rect.centery = bird.rect.centery + bird.rect.height * vy
+        self.life = life
+        
+    def update(self):
+        self.life -= 1
+        if self.life < 0:
+            self.kill()
+
 
 def main():
     pg.display.set_caption("真！こうかとん無双")
@@ -260,6 +286,7 @@ def main():
     beams = pg.sprite.Group()
     exps = pg.sprite.Group()
     emys = pg.sprite.Group()
+    shields = pg.sprite.Group()
 
     tmr = 0
     clock = pg.time.Clock()
@@ -270,6 +297,15 @@ def main():
                 return 0
             if event.type == pg.KEYDOWN and event.key == pg.K_SPACE:
                 beams.add(Beam(bird))
+            if event.type == pg.KEYDOWN and event.key == pg.K_CAPSLOCK and len(shields) == 0:
+                if score.score >= 20 :
+                    vx, vy = bird.dire
+                    if vx != 0 and vy != 0:
+                        pass
+                    else:
+                        shields.add(Shield(bird, 400)) 
+                        score.score -= 20
+                        
         screen.blit(bg_img, [0, 0])
 
         if tmr%200 == 0:  # 200フレームに1回，敵機を出現させる
@@ -288,6 +324,10 @@ def main():
         for bomb in pg.sprite.groupcollide(bombs, beams, True, True).keys():
             exps.add(Explosion(bomb, 50))  # 爆発エフェクト
             score.score_up(1)  # 1点アップ
+            
+        for bomb in pg.sprite.groupcollide(bombs, shields, True, False).keys():
+            exps.add(Explosion(bomb, 50)) # 爆発エフェクト
+            score.score_up(1) # 1点アップ
 
         if len(pg.sprite.spritecollide(bird, bombs, True)) != 0:
             bird.change_img(8, screen) # こうかとん悲しみエフェクト
@@ -306,6 +346,8 @@ def main():
         exps.update()
         exps.draw(screen)
         score.update(screen)
+        shields.update()
+        shields.draw(screen)
         pg.display.update()
         tmr += 1
         clock.tick(50)
