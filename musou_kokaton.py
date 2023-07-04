@@ -97,6 +97,7 @@ class Bird(pg.sprite.Sprite):
         押下キーに応じてこうかとんを移動させる
         引数1 key_lst：押下キーの真理値リスト
         引数2 screen：画面Surface
+        追加機能1（こうかとんの高速化）
         """
         sum_mv = [0, 0]
         for k, mv in __class__.delta.items():
@@ -110,6 +111,7 @@ class Bird(pg.sprite.Sprite):
                     self.rect.move_ip(-self.speed*mv[0], -self.speed*mv[1])
         if not (sum_mv[0] == 0 and sum_mv[1] == 0):
             self.dire = tuple(sum_mv)
+
             if self.state=="normal":
                 self.image = self.imgs[self.dire]
             if self.state=="hyper":
@@ -118,6 +120,16 @@ class Bird(pg.sprite.Sprite):
         if self.state=="hyper":
             self.image=pg.transform.laplacian(self.image)
             self.hyper_life-=1
+
+            self.image = self.imgs[self.dire]
+
+        for event in pg.event.get(): #左シフトをおすと速度が上がる
+            if event.type == pg.KEYDOWN and event.key == pg.K_LSHIFT:
+                self.speed = 20
+            elif event.type == pg.KEYDOWN:
+                self.speed = 10
+                
+
         screen.blit(self.image, self.rect)
         if self.hyper_life<=0:
             self.change_state("normal",-1)
@@ -165,7 +177,7 @@ class Beam(pg.sprite.Sprite):
     """
     ビームに関するクラス
     """
-    def __init__(self, bird: Bird):
+    def __init__(self, bird: Bird, spin=0):
         """
         ビーム画像Surfaceを生成する
         引数 bird：ビームを放つこうかとん
@@ -173,6 +185,7 @@ class Beam(pg.sprite.Sprite):
         super().__init__()
         self.vx, self.vy = bird.get_direction()
         angle = math.degrees(math.atan2(-self.vy, self.vx))
+        angle += spin  # 追加機能4
         self.image = pg.transform.rotozoom(pg.image.load(f"ex04/fig/beam.png"), angle, 2.0)
         self.vx = math.cos(math.radians(angle))
         self.vy = -math.sin(math.radians(angle))
@@ -183,12 +196,25 @@ class Beam(pg.sprite.Sprite):
 
     def update(self):
         """
-        ビームを速度ベクトルself.vx, self.vyに基づき移動させる
+        ビームの速度をself.vx, self.vyに基づき移動するようにする
         引数 screen：画面Surface
         """
         self.rect.move_ip(+self.speed*self.vx, +self.speed*self.vy)
         if check_bound(self.rect) != (True, True):
             self.kill()
+
+
+class NeoBeam:  # 追加機能4
+    def __init__(self, bird:Bird, num:int):
+        self.bird = bird
+        self.num = num
+
+    def gen_beams(self):
+        beam_ls = []
+        for spin in range(-275, 55, 25):#25度ずつ（－50で5個、－275で全方向）
+            beam = Beam(self.bird, spin)
+            beam_ls.append(beam)
+        return beam_ls
 
 
 class Explosion(pg.sprite.Sprite):
@@ -285,14 +311,22 @@ def main():
     clock = pg.time.Clock()
     while True:
         key_lst = pg.key.get_pressed()
+        shift_pressed = False  # 追加機能4
+
         for event in pg.event.get():
             if event.type == pg.QUIT:
                 return 0
             if event.type == pg.KEYDOWN and event.key == pg.K_SPACE:
                 beams.add(Beam(bird))
+
             if event.type == pg.KEYDOWN and event.key == pg.K_RSHIFT and score.score>=100:
                     score.score_up(-100)
                     bird.change_state("hyper",500)
+
+                if pg.key.get_mods() & pg.KMOD_LSHIFT:  # 追加機能4
+                    shift_pressed = True
+
+
         screen.blit(bg_img, [0, 0])
 
         if tmr%200 == 0:  # 200フレームに1回，敵機を出現させる
@@ -311,6 +345,12 @@ def main():
         for bomb in pg.sprite.groupcollide(bombs, beams, True, True).keys():
             exps.add(Explosion(bomb, 50))  # 爆発エフェクト
             score.score_up(1)  # 1点アップ
+
+        if shift_pressed:  # 追加機能4
+            if pg.key.get_mods() & pg.KMOD_LSHIFT:
+                num_beams = 5
+                neo_beam = NeoBeam(bird, num_beams)
+                beams.add(*neo_beam.gen_beams())
 
         if len(pg.sprite.spritecollide(bird, bombs, True)) != 0:
             if bird.state=="hyper":
