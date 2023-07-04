@@ -2,8 +2,10 @@ import math
 import random
 import sys
 import time
+from typing import Any
 
 import pygame as pg
+from pygame.sprite import AbstractGroup
 
 
 WIDTH = 1600  # ゲームウィンドウの幅
@@ -272,6 +274,22 @@ class Enemy(pg.sprite.Sprite):
             self.state = "stop"
         self.rect.centery += self.vy
 
+class Gravity(pg.sprite.Sprite):
+    def __init__(self, bird:Bird, size:int, life:int):
+        super().__init__()
+        rad = size  
+        self.image = pg.Surface((2*rad, 2*rad))
+        pg.draw.circle(self.image, (10, 10, 10), (rad, rad), rad)
+        self.image.set_colorkey((0, 0, 0))
+        self.image.set_alpha(200)
+        self.rect = self.image.get_rect(center=bird.rect.center)
+        self.life = life
+        
+    def update(self):
+        self.life -= 1
+        if self.life < 0:
+            self.kill()
+
 
 class Score:
     """
@@ -306,6 +324,7 @@ def main():
     beams = pg.sprite.Group()
     exps = pg.sprite.Group()
     emys = pg.sprite.Group()
+    grav = pg.sprite.Group()
 
     tmr = 0
     clock = pg.time.Clock()
@@ -319,12 +338,19 @@ def main():
             if event.type == pg.KEYDOWN and event.key == pg.K_SPACE:
                 beams.add(Beam(bird))
 
+            if event.type == pg.KEYDOWN and event.key == pg.K_TAB:
+                if score.score >= 50:
+                    grav.add(Gravity(bird, 200, 500))
+                    score.score_up(-50)
+
+
             if event.type == pg.KEYDOWN and event.key == pg.K_RSHIFT and score.score>=100:
                     score.score_up(-100)
                     bird.change_state("hyper",500)
 
                 if pg.key.get_mods() & pg.KMOD_LSHIFT:  # 追加機能4
                     shift_pressed = True
+
 
 
         screen.blit(bg_img, [0, 0])
@@ -345,6 +371,10 @@ def main():
         for bomb in pg.sprite.groupcollide(bombs, beams, True, True).keys():
             exps.add(Explosion(bomb, 50))  # 爆発エフェクト
             score.score_up(1)  # 1点アップ
+        for bomb in pg.sprite.groupcollide(bombs, grav, True, True).keys():
+            exps.add(Explosion(bomb, 50))  # 爆発エフェクト
+            score.score_up(1)  # 1点アップ
+
 
         if shift_pressed:  # 追加機能4
             if pg.key.get_mods() & pg.KMOD_LSHIFT:
@@ -373,6 +403,8 @@ def main():
         exps.update()
         exps.draw(screen)
         score.update(screen)
+        grav.update()
+        grav.draw(screen)
         pg.display.update()
         tmr += 1
         clock.tick(50)
